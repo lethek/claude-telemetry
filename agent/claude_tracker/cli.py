@@ -130,7 +130,11 @@ def setup(
         elif not config.get("api_key"):
             config["api_key"] = generate_api_key()
     else:
-        default_name = existing_config.get("machine_name") if existing_config else platform.node()
+        if existing_config:
+            default_name = existing_config.get("machine_name", platform.node())
+        else:
+            # Append short UUID to hostname to avoid duplicates across PCs
+            default_name = f"{platform.node()}-{generate_machine_id()[:4]}"
         config["machine_name"] = click.prompt("Machine name", default=default_name)
         config["supabase_url"] = click.prompt(
             "Supabase URL",
@@ -193,6 +197,20 @@ def sync(verbose: bool, daily_only: bool, force: bool) -> None:
     client = create_client(config["supabase_url"], config["supabase_service_key"])
 
     click.echo(f"Syncing machine: {config['machine_name']} ({machine_id[:8]}...)")
+
+    # Ensure machine is registered (fixes FK constraint failures)
+    try:
+        client.table("machines").upsert({
+            "id": machine_id,
+            "name": config["machine_name"],
+            "api_key": config.get("api_key", ""),
+            "os": detect_os(),
+            "hostname": platform.node(),
+        }, on_conflict="id").execute()
+    except Exception as e:
+        click.echo(f"\n  ERROR: Cannot register machine in Supabase: {e}", err=True)
+        click.echo("  Check your supabase_url and supabase_service_key in config.", err=True)
+        raise SystemExit(1)
 
     # Daily usage
     click.echo("\n  Collecting daily usage...", nl=False)

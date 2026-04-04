@@ -38,7 +38,7 @@ def sync_daily_usage(
 
     rows = []
     for record in records:
-        if last_sync and record.date <= last_sync[:10]:
+        if last_sync and record.date < last_sync[:10]:
             continue
         rows.append({
             "machine_id": machine_id,

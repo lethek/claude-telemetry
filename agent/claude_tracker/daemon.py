@@ -40,9 +40,19 @@ def _run_sync_cycle(config: dict[str, Any]) -> dict[str, int]:
     from supabase import create_client
     from .sync import sync_daily_usage, sync_sessions, sync_rate_limits, sync_stats_extra
 
+    import platform as _platform
+
     machine_id = config["machine_id"]
     client = create_client(config["supabase_url"], config["supabase_service_key"])
     results: dict[str, int] = {}
+
+    # Ensure machine is registered (prevents FK failures)
+    client.table("machines").upsert({
+        "id": machine_id,
+        "name": config.get("machine_name", _platform.node()),
+        "api_key": config.get("api_key", ""),
+        "hostname": _platform.node(),
+    }, on_conflict="id").execute()
 
     # Daily usage
     since = None
