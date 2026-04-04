@@ -2,7 +2,7 @@
 
 # claude-telemetry
 
-<img src="docs/screenshot-overview.png" alt="Dashboard Overview" width="900">
+<img src="docs/screenshot-overview.png" alt="Dashboard Overview" width="800">
 
 **Centralized Claude Code usage tracking across multiple PCs**
 
@@ -173,6 +173,14 @@ If this tool saved you from rate limit blindness, consider buying me a coffee:
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ryanbarbosa)
 
 Or just star the repo — it helps a lot!
+
+## Star History
+
+<div align="center">
+<a href="https://star-history.com/#RyanTech00/claude-telemetry&Date">
+  <img src="https://api.star-history.com/svg?repos=RyanTech00/claude-telemetry&type=Date" width="500" alt="Star History">
+</a>
+</div>
 
 ## License
 
