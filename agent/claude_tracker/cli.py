@@ -133,8 +133,7 @@ def setup(
         if existing_config:
             default_name = existing_config.get("machine_name", platform.node())
         else:
-            # Append short UUID to hostname to avoid duplicates across PCs
-            default_name = f"{platform.node()}-{generate_machine_id()[:4]}"
+            default_name = platform.node()
         config["machine_name"] = click.prompt("Machine name", default=default_name)
         config["supabase_url"] = click.prompt(
             "Supabase URL",
