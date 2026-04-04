@@ -69,17 +69,7 @@ claude-tracker install-service  # auto-sync every 15min
 
 ## Architecture
 
-```
-PCs (Agent)           Supabase (DB)         Cloudflare (Dashboard)
-┌──────────┐         ┌──────────┐          ┌────────────────┐
-│ PC 1     │───────> │ Postgres │ <─────── │ Pages + Workers │
-│ PC 2     │───────> │ (free)   │          │ (free)          │
-│ PC 3     │───────> │          │          │ Zero exposed    │
-│ PC N     │───────> │          │          │ keys            │
-└──────────┘         └──────────┘          └────────────────┘
-  ccusage              RLS + Auth            React + Recharts
-  auto-sync            Magic Link            Dark theme
-```
+![Architecture](docs/architecture.svg)
 
 ## Dashboard Pages
 
