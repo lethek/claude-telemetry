@@ -1,6 +1,7 @@
 interface Env {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_KEY: string;
+  ALLOWED_EMAILS?: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -13,9 +14,20 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     );
   }
 
-  // Determine the redirect URL for the magic link callback
-  const origin = new URL(context.request.url).origin;
-  const redirectTo = `${origin}/api/auth/callback`;
+  const email = body.email.trim().toLowerCase();
+
+  // Check if email is authorized
+  const allowedEmails = context.env.ALLOWED_EMAILS
+    ?.split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean) || [];
+
+  if (allowedEmails.length > 0 && !allowedEmails.includes(email)) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized email" }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   const response = await fetch(
     `${context.env.SUPABASE_URL}/auth/v1/magiclink`,
@@ -27,7 +39,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         Authorization: `Bearer ${context.env.SUPABASE_SERVICE_KEY}`,
       },
       body: JSON.stringify({
-        email: body.email,
+        email,
         data: {},
         gotrue_meta_security: { captcha_token: "" },
         code_challenge: null,

@@ -57,6 +57,7 @@ npm install
 npx wrangler pages project create claude-telemetry
 npx wrangler pages secret put SUPABASE_URL        # paste Project URL
 npx wrangler pages secret put SUPABASE_SERVICE_KEY # paste service_role key
+npx wrangler pages secret put ALLOWED_EMAILS       # e.g. "you@email.com,friend@email.com"
 npm run build
 npx wrangler pages deploy dist
 ```
@@ -107,6 +108,17 @@ claude-tracker install-service  # auto-sync every 15min
 | `claude-tracker status` | Show config and last sync |
 | `claude-tracker local --daily` | View local data without syncing |
 | `claude-tracker uninstall` | Remove agent config from this machine |
+
+## Security
+
+- **Dashboard access**: Only emails listed in `ALLOWED_EMAILS` can log in. Set via:
+  ```bash
+  npx wrangler pages secret put ALLOWED_EMAILS
+  # value: "you@email.com" or "you@email.com,teammate@email.com"
+  ```
+- **API proxy**: All Supabase keys are server-side only (Cloudflare Workers). Zero secrets in the browser bundle.
+- **Agent auth**: Each machine uses a unique API key stored locally in `~/.claude-tracker/config.json`.
+- **RLS**: Row-Level Security ensures each user only sees their own machines and data.
 
 ## Uninstall
 

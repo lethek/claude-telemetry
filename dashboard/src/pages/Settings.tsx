@@ -47,6 +47,17 @@ export function Settings() {
     }
   }, [deleteTarget, loadMachines]);
 
+  const [allowedEmails, setAllowedEmails] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/config", {
+      headers: { Authorization: `Bearer ${localStorage.getItem("claude_tracker_token") || ""}` },
+    })
+      .then((r) => r.json())
+      .then((data: { allowed_emails: string[] }) => setAllowedEmails(data.allowed_emails))
+      .catch(() => {});
+  }, []);
+
   const saveThresholds = () => {
     localStorage.setItem("alert_daily_threshold", dailyThreshold);
     localStorage.setItem("alert_weekly_threshold", weeklyThreshold);
@@ -111,6 +122,24 @@ export function Settings() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Authorized emails */}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <h3 className="mb-3 text-sm font-medium">Authorized Emails</h3>
+        {allowedEmails.length > 0 ? (
+          <ul className="space-y-1">
+            {allowedEmails.map((email, i) => (
+              <li key={i} className="text-xs font-mono text-slate-300">{email}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-slate-500">No email restrictions configured (all emails allowed).</p>
+        )}
+        <p className="mt-3 text-[10px] text-slate-600">
+          To add or remove emails, update the ALLOWED_EMAILS secret in Cloudflare:{" "}
+          <code className="text-slate-400">npx wrangler pages secret put ALLOWED_EMAILS</code>
+        </p>
       </div>
 
       {/* Alert thresholds */}

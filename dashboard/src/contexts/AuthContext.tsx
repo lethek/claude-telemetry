@@ -113,6 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.ok && data.success) {
           return { success: true };
         }
+        if (res.status === 403) {
+          return { success: false, error: "This email is not authorized. Contact the admin to request access." };
+        }
         return { success: false, error: data.error || "Login failed" };
       } catch (e) {
         return {
