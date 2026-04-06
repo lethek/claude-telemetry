@@ -2,11 +2,14 @@ import { useState, useMemo, useEffect } from "react";
 import { useUsageData } from "../hooks/useUsageData";
 import { useMachineFilter } from "../hooks/useMachineFilter";
 import { fetchStatsExtra } from "../lib/api";
-import { rangeToDate } from "../lib/dateUtils";
+import { rangeToDate, groupByWeek } from "../lib/dateUtils";
+import { usePreferences } from "../hooks/usePreferences";
 import { DateRangePicker } from "../components/filters/DateRangePicker";
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,9 +20,28 @@ import {
 
 export function Daily() {
   const [range, setRange] = useState("30d");
+  const [view, setView] = useState<"daily" | "weekly">("daily");
   const dateRange = useMemo(() => rangeToDate(range), [range]);
   const { summary, loading } = useUsageData(dateRange);
   const { machineId } = useMachineFilter();
+  const { prefs } = usePreferences();
+
+  const weeklyData = useMemo(
+    () => groupByWeek(summary, prefs.week_start_day),
+    [summary, prefs.week_start_day],
+  );
+
+  // Alert: current week vs average of last 4
+  const weeklyAlert = useMemo(() => {
+    if (weeklyData.length < 2) return null;
+    const current = weeklyData[weeklyData.length - 1];
+    const prev = weeklyData.slice(0, -1).slice(-4);
+    const avg = prev.reduce((s, w) => s + w.totalCost, 0) / prev.length;
+    if (current.totalCost > avg * 1.2) {
+      return `This week ($${current.totalCost.toFixed(2)}) is ${((current.totalCost / avg - 1) * 100).toFixed(0)}% above your 4-week average ($${avg.toFixed(2)})`;
+    }
+    return null;
+  }, [weeklyData]);
 
   const [hourCounts, setHourCounts] = useState<Record<string, number> | null>(null);
 
@@ -58,8 +80,25 @@ export function Daily() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Daily Usage</h2>
-        <DateRangePicker value={range} onChange={setRange} />
+        <h2 className="text-xl font-semibold">Usage</h2>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center rounded-lg border border-white/[0.06] bg-white/[0.02] p-1">
+            {(["daily", "weekly"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  view === v
+                    ? "bg-white/[0.08] text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
+          <DateRangePicker value={range} onChange={setRange} />
+        </div>
       </div>
 
       {loading && (
@@ -69,60 +108,52 @@ export function Daily() {
         </div>
       )}
 
-      {/* Stacked area chart */}
+      {/* Weekly alert */}
+      {view === "weekly" && weeklyAlert && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+          <p className="text-xs text-amber-400">{"\u26A0\uFE0F"} {weeklyAlert}</p>
+        </div>
+      )}
+
+      {/* Chart */}
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-        <h3 className="mb-4 text-sm font-medium">Daily Cost by Model</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={summary} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 10, fill: "#94a3b8" }}
-              tickFormatter={(v: string) => v.slice(5)}
-            />
-            <YAxis
-              tick={{ fontSize: 10, fill: "#94a3b8" }}
-              tickFormatter={(v: number) => `$${v}`}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#0f172a",
-                border: "1px solid rgb(51,65,85)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              formatter={(v: number) => [`$${v.toFixed(2)}`, ""]}
-            />
-            <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8} />
-            <Area
-              type="monotone"
-              dataKey="opus_cost"
-              name="Opus"
-              stackId="1"
-              stroke="#f43f5e"
-              fill="#f43f5e"
-              fillOpacity={0.4}
-            />
-            <Area
-              type="monotone"
-              dataKey="sonnet_cost"
-              name="Sonnet"
-              stackId="1"
-              stroke="#38bdf8"
-              fill="#38bdf8"
-              fillOpacity={0.4}
-            />
-            <Area
-              type="monotone"
-              dataKey="haiku_cost"
-              name="Haiku"
-              stackId="1"
-              stroke="#34d399"
-              fill="#34d399"
-              fillOpacity={0.4}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <h3 className="mb-4 text-sm font-medium">
+          {view === "daily" ? "Daily Cost by Model" : "Weekly Cost by Model"}
+        </h3>
+        {view === "daily" ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={summary} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v: string) => v.slice(5)} />
+              <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v: number) => `$${v}`} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "#0f172a", border: "1px solid rgb(51,65,85)", borderRadius: 8, fontSize: 12 }}
+                formatter={(v: number) => [`$${v.toFixed(2)}`, ""]}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8} />
+              <Area type="monotone" dataKey="opus_cost" name="Opus" stackId="1" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.4} />
+              <Area type="monotone" dataKey="sonnet_cost" name="Sonnet" stackId="1" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.4} />
+              <Area type="monotone" dataKey="haiku_cost" name="Haiku" stackId="1" stroke="#34d399" fill="#34d399" fillOpacity={0.4} />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={weeklyData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
+              <XAxis dataKey="week" tick={{ fontSize: 10, fill: "#94a3b8" }} />
+              <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v: number) => `$${v}`} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "#0f172a", border: "1px solid rgb(51,65,85)", borderRadius: 8, fontSize: 12, color: "white" }}
+                formatter={(v: number) => [`$${v.toFixed(2)}`, ""]}
+                labelStyle={{ color: "#cbd5e1" }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8} />
+              <Bar dataKey="opusCost" name="Opus" stackId="1" fill="#f43f5e" />
+              <Bar dataKey="sonnetCost" name="Sonnet" stackId="1" fill="#38bdf8" />
+              <Bar dataKey="haikuCost" name="Haiku" stackId="1" fill="#34d399" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

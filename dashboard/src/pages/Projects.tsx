@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useUsageData } from "../hooks/useUsageData";
+import { usePreferences } from "../hooks/usePreferences";
 import { rangeToDate } from "../lib/dateUtils";
 import { DateRangePicker } from "../components/filters/DateRangePicker";
 import { MetricCard } from "../components/cards/MetricCard";
@@ -53,6 +54,7 @@ export function Projects() {
   const dateRange = useMemo(() => rangeToDate(range), [range]);
   const { projects, loading } = useUsageData(dateRange);
 
+  const { prefs } = usePreferences();
   const totalCost = projects.reduce((s, p) => s + p.total_cost, 0);
 
   // Pie data: top 8 + "Others"
@@ -188,6 +190,7 @@ export function Projects() {
                 <th className="pb-2 text-right font-medium">%</th>
                 <th className="pb-2 text-left font-medium">Model</th>
                 <th className="pb-2 text-right font-medium">Machines</th>
+                <th className="pb-2 text-left font-medium">Budget</th>
                 <th className="pb-2 text-left font-medium">Bar</th>
               </tr>
             </thead>
@@ -221,6 +224,22 @@ export function Projects() {
                     </td>
                     <td className="py-1.5 text-right font-mono text-slate-400">
                       {p.machines_used}
+                    </td>
+                    <td className="py-1.5 w-28">
+                      {(() => {
+                        const budget = prefs.project_budgets?.[p.project];
+                        if (!budget) return <span className="text-slate-600">—</span>;
+                        const budgetPct = (p.total_cost / budget) * 100;
+                        const color = budgetPct > 90 ? "bg-rose-500" : budgetPct > 70 ? "bg-amber-500" : "bg-emerald-500";
+                        return (
+                          <div>
+                            <div className="h-2 rounded-full bg-white/[0.04]">
+                              <div className={`h-2 rounded-full ${color}`} style={{ width: `${Math.min(100, budgetPct)}%` }} />
+                            </div>
+                            <span className="text-[9px] text-slate-500">${p.total_cost.toFixed(0)}/${budget}</span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="py-1.5 w-32">
                       <div className="h-2 rounded-full bg-white/[0.04]">

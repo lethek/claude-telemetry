@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import CONFIG_DIR, load_config
-from .collector import collect_daily_usage, collect_session_usage, collect_rate_limits
+from .collector import collect_daily_usage, collect_session_usage, collect_rate_limits, collect_blocks_usage
 from .extras import read_stats_cache
 
 LOG_FILE = CONFIG_DIR / "daemon.log"
@@ -38,7 +38,7 @@ def _setup_logging(verbose: bool = False) -> None:
 def _run_sync_cycle(config: dict[str, Any]) -> dict[str, int]:
     """Run one full sync cycle. Returns {source: records_upserted}."""
     from supabase import create_client
-    from .sync import sync_daily_usage, sync_sessions, sync_rate_limits, sync_stats_extra
+    from .sync import sync_daily_usage, sync_sessions, sync_rate_limits, sync_stats_extra, sync_blocks
 
     import platform as _platform
 
@@ -87,6 +87,12 @@ def _run_sync_cycle(config: dict[str, Any]) -> dict[str, int]:
     if stats:
         r = sync_stats_extra(stats, machine_id, client)
         results["stats_extra"] = r.records_upserted
+
+    # Blocks
+    blocks = collect_blocks_usage()
+    if blocks:
+        r = sync_blocks(blocks, machine_id, client)
+        results["blocks"] = r.records_upserted
 
     return results
 

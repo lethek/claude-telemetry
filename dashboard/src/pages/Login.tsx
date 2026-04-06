@@ -30,7 +30,7 @@ export function Login() {
       <div className="w-full max-w-sm space-y-6">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-rose-500 to-sky-400" />
+          <img src="/favicon.svg" alt="Logo" className="h-12 w-12" />
           <h1 className="text-xl font-semibold text-white">Claude Tracker</h1>
           <p className="text-xs text-slate-500">
             Centralized token usage tracking

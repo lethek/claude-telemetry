@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bracket-grad" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#93C5FD"/>
+    </linearGradient>
+  </defs>
+  <!-- Terminal bracket > -->
+  <path d="M16 32 L44 64 L16 96" fill="none" stroke="url(#bracket-grad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Bar chart - 3 ascending bars -->
+  <rect x="60" y="76" width="14" height="20" rx="2" fill="#3B82F6"/>
+  <rect x="80" y="56" width="14" height="40" rx="2" fill="#3B82F6"/>
+  <rect x="100" y="36" width="14" height="60" rx="2" fill="#F59E0B"/>
+  <!-- Cursor underscore -->
+  <rect x="48" y="92" width="20" height="4" rx="2" fill="#F59E0B"/>
+</svg>

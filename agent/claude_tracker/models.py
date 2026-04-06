@@ -57,6 +57,23 @@ class StatsExtra:
 
 
 @dataclass
+class BlockUsage:
+    block_start: str
+    block_end: str
+    is_active: bool = False
+    is_gap: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
+    total_tokens: int = 0
+    cost_usd: float = 0.0
+    models: list[str] = field(default_factory=list)
+    duration_minutes: int = 0
+    entries: int = 0
+
+
+@dataclass
 class SyncResult:
     source: str
     records_upserted: int = 0

@@ -90,6 +90,12 @@ function getCommands(
         "claude-tracker sync --verbose",
       ].join("\n"),
     },
+    {
+      step: "5",
+      label: "Enable rate limit tracking (optional)",
+      code: [activateCmd, "claude-tracker setup-statusline"].join("\n"),
+      warning: "This enables 5-hour and weekly rate limit % tracking in the dashboard.",
+    },
   ];
 }
 

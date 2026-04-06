@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { MachineFilterProvider } from "./hooks/useMachineFilter";
+import { PreferencesContext, usePreferencesProvider } from "./hooks/usePreferences";
 import { useUsageData } from "./hooks/useUsageData";
 import { useAlertThresholds } from "./hooks/useAlertThresholds";
 import { daysAgo, today } from "./lib/dateUtils";
@@ -9,6 +10,7 @@ import { Layout } from "./components/layout/Layout";
 import { Login } from "./pages/Login";
 import { Overview } from "./pages/Overview";
 import { Daily } from "./pages/Daily";
+import { Blocks } from "./pages/Blocks";
 import { Projects } from "./pages/Projects";
 import { Models } from "./pages/Models";
 import { Machines } from "./pages/Machines";
@@ -20,6 +22,7 @@ import { Settings } from "./pages/Settings";
 const PAGE_TITLES: Record<string, string> = {
   overview: "Overview",
   daily: "Daily Usage",
+  blocks: "5-Hour Blocks",
   projects: "Projects",
   models: "Models",
   machines: "Machines",
@@ -33,6 +36,8 @@ function PageRouter({ page }: { page: string }) {
   switch (page) {
     case "daily":
       return <Daily />;
+    case "blocks":
+      return <Blocks />;
     case "projects":
       return <Projects />;
     case "models":
@@ -79,6 +84,9 @@ function AuthenticatedApp() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, [page]);
 
+  // All hooks MUST be called before any conditional returns (React rules of hooks)
+  const prefsCtx = usePreferencesProvider();
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950">
@@ -95,9 +103,11 @@ function AuthenticatedApp() {
   }
 
   return (
-    <MachineFilterProvider>
-      <DashboardShell page={page} onNavigate={navigate} />
-    </MachineFilterProvider>
+    <PreferencesContext.Provider value={prefsCtx}>
+      <MachineFilterProvider>
+        <DashboardShell page={page} onNavigate={navigate} />
+      </MachineFilterProvider>
+    </PreferencesContext.Provider>
   );
 }
 

@@ -10,7 +10,7 @@ from typing import Any
 from supabase import create_client, Client
 
 from .config import load_config, update_last_sync, get_last_sync
-from .models import DailyUsage, SessionUsage, RateLimit, StatsExtra, SyncResult
+from .models import DailyUsage, SessionUsage, RateLimit, StatsExtra, BlockUsage, SyncResult
 
 logger = logging.getLogger("claude-tracker")
 
@@ -233,6 +233,64 @@ def sync_stats_extra(
 
     return SyncResult(
         source="stats_extra",
+        records_upserted=upserted,
+        errors=errors,
+        duration_ms=elapsed,
+    )
+
+
+def sync_blocks(
+    records: list[BlockUsage],
+    machine_id: str,
+    client: Client,
+) -> SyncResult:
+    """Batch upsert block records to Supabase."""
+    start_t = time.monotonic()
+    errors: list[str] = []
+    upserted = 0
+
+    rows = []
+    for record in records:
+        rows.append({
+            "machine_id": machine_id,
+            "block_start": record.block_start,
+            "block_end": record.block_end,
+            "is_active": record.is_active,
+            "is_gap": record.is_gap,
+            "input_tokens": record.input_tokens,
+            "output_tokens": record.output_tokens,
+            "cache_creation_tokens": record.cache_creation_tokens,
+            "cache_read_tokens": record.cache_read_tokens,
+            "total_tokens": record.total_tokens,
+            "cost_usd": record.cost_usd,
+            "models": record.models,
+            "duration_minutes": record.duration_minutes,
+            "entries": record.entries,
+        })
+
+    # Deduplicate by (machine_id, block_start)
+    seen: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        key = (row["machine_id"], row["block_start"])
+        if key not in seen or row.get("cost_usd", 0) > seen[key].get("cost_usd", 0):
+            seen[key] = row
+    rows = list(seen.values())
+
+    if rows:
+        try:
+            client.table("blocks").upsert(
+                rows,
+                on_conflict="machine_id,block_start",
+            ).execute()
+            upserted = len(rows)
+        except Exception as e:
+            errors.append(f"blocks batch: {e}")
+
+    elapsed = int((time.monotonic() - start_t) * 1000)
+    _log_sync(client, machine_id, "blocks", upserted, errors, elapsed)
+
+    return SyncResult(
+        source="blocks",
         records_upserted=upserted,
         errors=errors,
         duration_ms=elapsed,

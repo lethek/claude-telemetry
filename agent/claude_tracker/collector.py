@@ -7,7 +7,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-from .models import DailyUsage, SessionUsage, RateLimit
+from .models import DailyUsage, SessionUsage, RateLimit, BlockUsage
 
 
 class CollectorError(Exception):
@@ -168,3 +168,53 @@ def collect_rate_limits(ccost_path: str | None = None) -> list[RateLimit] | None
         return results
     except (CollectorError, FileNotFoundError, json.JSONDecodeError):
         return None
+
+
+def collect_blocks_usage() -> list[BlockUsage]:
+    """Call `npx ccusage@latest blocks --json --recent` and parse into BlockUsage records."""
+    cmd = ["npx", "ccusage@latest", "blocks", "--json", "--recent", "--no-color"]
+    try:
+        raw = _run_command(cmd)
+    except CollectorError:
+        return []
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+
+    results: list[BlockUsage] = []
+    for b in data.get("blocks", []):
+        tc = b.get("tokenCounts", {})
+        start = b.get("startTime", "")
+        end = b.get("endTime", "")
+
+        # Calculate duration in minutes
+        duration = 0
+        if start and end:
+            try:
+                from dateutil.parser import isoparse
+                dt_start = isoparse(start)
+                actual_end = b.get("actualEndTime") or end
+                dt_end = isoparse(actual_end)
+                duration = max(0, int((dt_end - dt_start).total_seconds() / 60))
+            except Exception:
+                pass
+
+        results.append(BlockUsage(
+            block_start=start,
+            block_end=end,
+            is_active=b.get("isActive", False),
+            is_gap=b.get("isGap", False),
+            input_tokens=tc.get("inputTokens", 0),
+            output_tokens=tc.get("outputTokens", 0),
+            cache_creation_tokens=tc.get("cacheCreationInputTokens", 0),
+            cache_read_tokens=tc.get("cacheReadInputTokens", 0),
+            total_tokens=b.get("totalTokens", 0),
+            cost_usd=b.get("costUSD", 0.0),
+            models=b.get("models", []),
+            duration_minutes=duration,
+            entries=b.get("entries", 0),
+        ))
+
+    return results

@@ -25,7 +25,7 @@ from .config import (
     load_config,
     save_config,
 )
-from .collector import collect_daily_usage, collect_session_usage, collect_rate_limits
+from .collector import collect_daily_usage, collect_session_usage, collect_rate_limits, collect_blocks_usage
 from .extras import read_stats_cache, read_history_index
 
 
@@ -189,7 +189,7 @@ def setup(
 def sync(verbose: bool, daily_only: bool, force: bool) -> None:
     """Collect data from ccusage and sync to Supabase."""
     from supabase import create_client
-    from .sync import sync_daily_usage, sync_sessions, sync_rate_limits, sync_stats_extra
+    from .sync import sync_daily_usage, sync_sessions, sync_rate_limits, sync_stats_extra, sync_blocks
 
     config = load_config()
     machine_id = config["machine_id"]
@@ -272,6 +272,17 @@ def sync(verbose: bool, daily_only: bool, force: bool) -> None:
     else:
         click.echo(" not found")
 
+    # Blocks
+    click.echo("\n  Collecting blocks...", nl=False)
+    blocks = collect_blocks_usage()
+    click.echo(f" {len(blocks)} blocks")
+    if blocks:
+        result = sync_blocks(blocks, machine_id, client)
+        click.echo(f"  Upserted: {result.records_upserted} ({result.duration_ms}ms)")
+        if result.errors:
+            for err in result.errors:
+                click.echo(f"  ERROR: {err}", err=True)
+
     click.echo("\nSync complete!")
 
 
@@ -294,9 +305,19 @@ def daemon(interval: int, verbose: bool, background: bool) -> None:
     run_daemon(interval_minutes=interval, verbose=verbose)
 
 
+def _get_pythonw() -> str:
+    """Get pythonw.exe path on Windows (no console window)."""
+    if sys.platform == "win32":
+        pythonw = Path(sys.executable).parent / "pythonw.exe"
+        if pythonw.exists():
+            return str(pythonw)
+    return sys.executable
+
+
 def _start_background_daemon(interval: int, verbose: bool) -> None:
     """Start daemon as a detached background process."""
-    args = [sys.executable, "-m", "claude_tracker.daemon", str(interval)]
+    exe = _get_pythonw() if sys.platform == "win32" else sys.executable
+    args = [exe, "-m", "claude_tracker.daemon", str(interval)]
     if verbose:
         args.append("--verbose")
 
@@ -391,6 +412,56 @@ def uninstall(yes: bool) -> None:
     )
 
 
+@main.command("setup-statusline")
+def setup_statusline() -> None:
+    """Configure Claude Code statusline for rate limit tracking."""
+    claude_dir = Path.home() / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    system = platform.system()
+
+    if system == "Windows":
+        script_path = claude_dir / "statusline.ps1"
+        script_path.write_text(textwrap.dedent("""\
+            $input = $Input | Out-String
+            $ts = [int](New-TimeSpan -Start (Get-Date '1970-01-01') -End (Get-Date).ToUniversalTime()).TotalSeconds
+            $line = '{{"ts":' + $ts + ',"data":' + $input.Trim() + '}}'
+            Add-Content -Path "$env:USERPROFILE\\.claude\\statusline.jsonl" -Value $line -Encoding UTF8
+        """))
+        click.echo(f"Created {script_path}")
+    else:
+        script_path = claude_dir / "statusline.sh"
+        script_path.write_text(textwrap.dedent("""\
+            #!/bin/bash
+            input=$(cat)
+            echo "{\\"ts\\":$(date +%s),\\"data\\":$input}" >> ~/.claude/statusline.jsonl
+        """))
+        script_path.chmod(0o755)
+        click.echo(f"Created {script_path}")
+
+    # Update settings.json
+    settings_path = claude_dir / "settings.json"
+    settings: dict = {}
+    if settings_path.exists():
+        import json as _json
+        try:
+            settings = _json.loads(settings_path.read_text())
+        except Exception:
+            pass
+
+    settings.setdefault("hooks", {})
+    settings["hooks"]["StatusLine"] = [
+        {
+            "type": "command",
+            "command": str(script_path),
+        }
+    ]
+
+    import json as _json
+    settings_path.write_text(_json.dumps(settings, indent=2))
+    click.echo(f"Updated {settings_path}")
+    click.echo("\nStatusline configured! Rate limit tracking will start on next Claude Code session.")
+
+
 @main.command("service-status")
 def service_status() -> None:
     """Show daemon service status."""
@@ -451,7 +522,8 @@ def service_status() -> None:
 # --- Windows Task Scheduler ---
 
 def _install_windows_service(tracker_path: str) -> None:
-    cmd_line = f'"{sys.executable}" -m claude_tracker.daemon 15'
+    exe = _get_pythonw()
+    cmd_line = f'"{exe}" -m claude_tracker.daemon 15'
     result = subprocess.run(
         [
             "schtasks", "/Create",

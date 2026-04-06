@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { UsageSummaryRow } from "../lib/queries";
 import { daysAgo } from "../lib/dateUtils";
+import { usePreferences } from "./usePreferences";
 
 export interface Alert {
   type: "daily" | "weekly";
@@ -10,13 +11,11 @@ export interface Alert {
 }
 
 export function useAlertThresholds(summary: UsageSummaryRow[]): Alert[] {
+  const { prefs } = usePreferences();
+
   return useMemo(() => {
-    const dailyThreshold = parseFloat(
-      localStorage.getItem("alert_daily_threshold") || "0",
-    );
-    const weeklyThreshold = parseFloat(
-      localStorage.getItem("alert_weekly_threshold") || "0",
-    );
+    const dailyThreshold = prefs.alert_thresholds?.daily || 0;
+    const weeklyThreshold = prefs.alert_thresholds?.weekly || 0;
 
     const alerts: Alert[] = [];
 
@@ -51,5 +50,5 @@ export function useAlertThresholds(summary: UsageSummaryRow[]): Alert[] {
     }
 
     return alerts;
-  }, [summary]);
+  }, [summary, prefs.alert_thresholds]);
 }

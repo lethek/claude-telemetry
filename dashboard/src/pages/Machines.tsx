@@ -140,6 +140,12 @@ export function Machines() {
                   <p className="font-mono font-medium">{m.days_active}</p>
                 </div>
                 <div>
+                  <p className="text-slate-500">Avg/Day</p>
+                  <p className="font-mono font-medium">
+                    ${m.days_active > 0 ? (m.total_cost / m.days_active).toFixed(2) : "0.00"}
+                  </p>
+                </div>
+                <div>
                   <p className="text-slate-500">Last Activity</p>
                   <p className="font-mono font-medium text-[10px]">
                     {m.last_activity || "never"}

@@ -1,7 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useUsageData } from "../hooks/useUsageData";
 import { useAlertThresholds } from "../hooks/useAlertThresholds";
-import { daysAgo, today } from "../lib/dateUtils";
+import { usePreferences } from "../hooks/usePreferences";
+import { useMachineFilter } from "../hooks/useMachineFilter";
+import { fetchRateLimits } from "../lib/api";
+import { daysAgo, today, formatTokens } from "../lib/dateUtils";
+import { calculateUsagePace } from "../lib/burnRate";
 
 interface InsightCardProps {
   icon: string;
@@ -37,8 +41,95 @@ export function Insights() {
   const { summary, projects, machines, weeklyRates, loading } =
     useUsageData(dateRange14);
   const thresholdAlerts = useAlertThresholds(summary);
+  const { prefs } = usePreferences();
+  const { machineId } = useMachineFilter();
+
+  const [rateLimits, setRateLimits] = useState<{
+    window_5h_percent?: number;
+    window_1w_percent?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetchRateLimits(machineId, "1")
+      .then((data) => {
+        const arr = data as Array<Record<string, unknown>>;
+        if (arr.length > 0) {
+          setRateLimits({
+            window_5h_percent: arr[0].window_5h_percent as number | undefined,
+            window_1w_percent: arr[0].window_1w_percent as number | undefined,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [machineId]);
 
   const insights: InsightCardProps[] = [];
+
+  // Plan value insight
+  if (prefs.plan_cost != null && prefs.plan_cost > 0) {
+    const activeDays14 = summary.length;
+    const totalCost14 = summary.reduce((s, r) => s + r.total_cost, 0);
+    const apiEquiv = activeDays14 > 0 ? (totalCost14 / activeDays14) * 30 : totalCost14;
+    const savings = apiEquiv - prefs.plan_cost;
+    const savingsPct = apiEquiv > 0 ? (savings / apiEquiv) * 100 : 0;
+
+    if (savingsPct > 50) {
+      insights.push({
+        icon: "\uD83D\uDCB0",
+        title: "Great Plan Value",
+        text: `You're saving ${savingsPct.toFixed(0)}% vs API pricing ($${apiEquiv.toFixed(0)} API equiv vs $${prefs.plan_cost}/mo plan).`,
+        color: "emerald",
+      });
+    } else if (savingsPct > 20) {
+      insights.push({
+        icon: "\uD83D\uDCCA",
+        title: "Decent Plan Value",
+        text: `Saving ${savingsPct.toFixed(0)}% vs API pricing. Your plan is paying off.`,
+        color: "sky",
+      });
+    } else if (savings > 0) {
+      insights.push({
+        icon: "\uD83D\uDCA1",
+        title: "Low Plan Utilization",
+        text: `Only saving ${savingsPct.toFixed(0)}% vs API. Consider if your plan tier matches your usage.`,
+        color: "amber",
+      });
+    } else {
+      insights.push({
+        icon: "\uD83D\uDCC9",
+        title: "Under Plan Cost",
+        text: `Your API equivalent ($${apiEquiv.toFixed(0)}/mo) is less than your plan ($${prefs.plan_cost}/mo). Consider downgrading.`,
+        color: "rose",
+      });
+    }
+  }
+
+  // Rate limit insights
+  if (rateLimits) {
+    if (rateLimits.window_5h_percent != null && rateLimits.window_5h_percent > 70) {
+      insights.push({
+        icon: "\u26A0\uFE0F",
+        title: "5-Hour Limit Warning",
+        text: `5-hour rate limit at ${rateLimits.window_5h_percent.toFixed(0)}%. Consider switching to Sonnet for routine tasks.`,
+        color: rateLimits.window_5h_percent > 90 ? "rose" : "amber",
+      });
+    }
+    if (rateLimits.window_1w_percent != null && rateLimits.window_1w_percent > 80) {
+      insights.push({
+        icon: "\uD83D\uDEA8",
+        title: "Weekly Limit Critical",
+        text: `Weekly rate limit at ${rateLimits.window_1w_percent.toFixed(0)}%. Reduce Opus usage to avoid throttling.`,
+        color: "rose",
+      });
+    }
+  } else {
+    insights.push({
+      icon: "\uD83D\uDCA1",
+      title: "Enable Rate Limit Tracking",
+      text: "Run claude-tracker setup-statusline to enable 5-hour and weekly rate limit monitoring.",
+      color: "sky",
+    });
+  }
 
   // Threshold alerts (from Settings)
   for (const alert of thresholdAlerts) {
@@ -48,6 +139,43 @@ export function Insights() {
       text: alert.message,
       color: "rose",
     });
+  }
+
+  // Usage pace / burn rate
+  const pace = calculateUsagePace(summary);
+  if (pace) {
+    const trendIcon = pace.trend === "increasing" ? "\uD83D\uDCC8" : pace.trend === "decreasing" ? "\uD83D\uDCC9" : "\uD83D\uDCCA";
+    const trendLabel = pace.trend === "increasing" ? `up ${pace.trendPct.toFixed(0)}%` : pace.trend === "decreasing" ? `down ${Math.abs(pace.trendPct).toFixed(0)}%` : "steady";
+    insights.push({
+      icon: trendIcon,
+      title: "Usage Pace",
+      text: `$${pace.avgDailyCost.toFixed(2)}/day avg | ~${formatTokens(pace.avgDailyTokens)} tokens/day | Projected: $${pace.projectedWeeklyCost.toFixed(0)}/week | Trend: ${trendLabel}`,
+      color: pace.trend === "increasing" ? "amber" : pace.trend === "decreasing" ? "emerald" : "sky",
+    });
+  }
+
+  // Project budget alerts
+  if (prefs.project_budgets && Object.keys(prefs.project_budgets).length > 0) {
+    for (const proj of projects) {
+      const budget = prefs.project_budgets[proj.project];
+      if (!budget) continue;
+      const pct = (proj.total_cost / budget) * 100;
+      if (pct > 100) {
+        insights.push({
+          icon: "\u274C",
+          title: "Over Budget",
+          text: `${proj.project} over budget by $${(proj.total_cost - budget).toFixed(2)} ($${proj.total_cost.toFixed(2)}/$${budget})`,
+          color: "rose",
+        });
+      } else if (pct > 90) {
+        insights.push({
+          icon: "\uD83D\uDEA8",
+          title: "Budget Warning",
+          text: `${proj.project} at ${pct.toFixed(0)}% of monthly budget ($${proj.total_cost.toFixed(2)}/$${budget})`,
+          color: "amber",
+        });
+      }
+    }
   }
 
   // Rate limit estimator
@@ -109,14 +237,20 @@ export function Insights() {
     });
   }
 
-  // Machine comparison
+  // Machine comparison + cross-machine burn rate
   if (machines.length > 1) {
     const sorted = [...machines].sort((a, b) => b.total_cost - a.total_cost);
     const top = sorted[0];
+    const activeMachines = machines.filter((m) => m.days_active > 0);
+    const combinedDailyAvg = activeMachines.reduce((s, m) => s + m.total_cost / Math.max(1, m.days_active), 0);
+    const breakdown = activeMachines
+      .map((m) => `${m.machine_name}: $${(m.total_cost / Math.max(1, m.days_active)).toFixed(2)}/day`)
+      .join(" | ");
+
     insights.push({
       icon: "\uD83D\uDDA5\uFE0F",
-      title: "Machine Comparison",
-      text: `"${top.machine_name}" is your highest-spending machine ($${top.total_cost.toFixed(2)}), primarily used for "${top.top_project || "various projects"}".`,
+      title: "Cross-Machine Usage",
+      text: `Combined pace: $${combinedDailyAvg.toFixed(2)}/day across ${activeMachines.length} machines. ${breakdown}. Top spender: "${top.machine_name}" ($${top.total_cost.toFixed(2)}).`,
       color: "sky",
     });
   }

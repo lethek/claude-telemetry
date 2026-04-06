@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { MetricCard } from "../components/cards/MetricCard";
 import { MachineCard } from "../components/cards/MachineCard";
 import { DailyCostChart } from "../components/charts/DailyCostChart";
@@ -6,12 +6,36 @@ import { ModelBreakdown } from "../components/charts/ModelBreakdown";
 import { MonthlyCostChart } from "../components/charts/MonthlyCostChart";
 import { DateRangePicker } from "../components/filters/DateRangePicker";
 import { useUsageData } from "../hooks/useUsageData";
+import { usePreferences } from "../hooks/usePreferences";
+import { useMachineFilter } from "../hooks/useMachineFilter";
+import { fetchRateLimits } from "../lib/api";
 import { rangeToDate, formatTokens } from "../lib/dateUtils";
 
 export function Overview() {
   const [range, setRange] = useState("30d");
   const dateRange = useMemo(() => rangeToDate(range), [range]);
   const { summary, projects, machines, loading, error } = useUsageData(dateRange);
+  const { prefs } = usePreferences();
+  const { machineId } = useMachineFilter();
+
+  const [rateLimits, setRateLimits] = useState<{
+    window_5h_percent?: number;
+    window_1w_percent?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetchRateLimits(machineId, "1")
+      .then((data) => {
+        const arr = data as Array<Record<string, unknown>>;
+        if (arr.length > 0) {
+          setRateLimits({
+            window_5h_percent: arr[0].window_5h_percent as number | undefined,
+            window_1w_percent: arr[0].window_1w_percent as number | undefined,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [machineId]);
 
   const totalCost = summary.reduce((s, r) => s + r.total_cost, 0);
   const totalTokens = summary.reduce((s, r) => s + r.total_tokens, 0);
@@ -87,7 +111,55 @@ export function Overview() {
           value={`${opusPct}%`}
           sub={`$${opusCost.toFixed(2)}`}
         />
+        {prefs.plan_cost != null && prefs.plan_cost > 0 && (() => {
+          const apiEquiv = daysActive > 0 ? (totalCost / daysActive) * 30 : totalCost;
+          const savings = apiEquiv - prefs.plan_cost;
+          const savingsPct = apiEquiv > 0 ? (savings / apiEquiv) * 100 : 0;
+          return (
+            <MetricCard
+              label="Plan Savings"
+              value={`$${Math.abs(savings).toFixed(0)}`}
+              sub={`Plan: $${prefs.plan_cost}/mo | API: $${apiEquiv.toFixed(0)} | ${savingsPct > 0 ? "Saving" : "Over"} ${Math.abs(savingsPct).toFixed(0)}%`}
+              trend={savings > 0 ? `${savingsPct.toFixed(0)}% saved` : `${Math.abs(savingsPct).toFixed(0)}% over`}
+              trendUp={savings > 0}
+            />
+          );
+        })()}
       </div>
+
+      {/* Rate limit bars */}
+      {rateLimits && (rateLimits.window_5h_percent != null || rateLimits.window_1w_percent != null) && (
+        <div className="grid grid-cols-2 gap-4">
+          {rateLimits.window_5h_percent != null && (
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <p className="text-xs font-medium text-slate-400 mb-2">Rate Limit (5h)</p>
+              <div className="h-3 rounded-full bg-white/[0.04]">
+                <div
+                  className={`h-3 rounded-full transition-all ${
+                    rateLimits.window_5h_percent > 80 ? "bg-rose-500" : rateLimits.window_5h_percent > 50 ? "bg-amber-500" : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.min(100, rateLimits.window_5h_percent)}%` }}
+                />
+              </div>
+              <p className="mt-1 text-xs font-mono text-slate-400">{rateLimits.window_5h_percent.toFixed(1)}%</p>
+            </div>
+          )}
+          {rateLimits.window_1w_percent != null && (
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <p className="text-xs font-medium text-slate-400 mb-2">Rate Limit (1w)</p>
+              <div className="h-3 rounded-full bg-white/[0.04]">
+                <div
+                  className={`h-3 rounded-full transition-all ${
+                    rateLimits.window_1w_percent > 80 ? "bg-rose-500" : rateLimits.window_1w_percent > 50 ? "bg-amber-500" : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.min(100, rateLimits.window_1w_percent)}%` }}
+                />
+              </div>
+              <p className="mt-1 text-xs font-mono text-slate-400">{rateLimits.window_1w_percent.toFixed(1)}%</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Charts row */}
       <div className="grid gap-4 lg:grid-cols-3">

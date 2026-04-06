@@ -217,6 +217,72 @@ export async function deleteMachine(
   return res.json();
 }
 
+// --- Blocks ---
+
+export interface BlockRow {
+  id: number;
+  machine_id: string;
+  block_start: string;
+  block_end: string;
+  is_active: boolean;
+  is_gap: boolean;
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_tokens: number;
+  cache_read_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  models: string[];
+  duration_minutes: number;
+  entries: number;
+}
+
+export async function fetchBlocks(opts?: {
+  machineId?: string;
+  startDate?: string;
+  endDate?: string;
+  activeOnly?: boolean;
+}): Promise<BlockRow[]> {
+  return fetchJson("blocks", {
+    machine_id: opts?.machineId,
+    start_date: opts?.startDate,
+    end_date: opts?.endDate,
+    active_only: opts?.activeOnly ? "true" : undefined,
+  });
+}
+
+// --- Preferences ---
+
+export interface UserPreferences {
+  user_id: string;
+  plan_cost: number | null;
+  plan_name: string;
+  project_budgets: Record<string, number>;
+  alert_thresholds: { daily: number; weekly: number };
+  week_start_day: string;
+  theme: string;
+  updated_at: string;
+}
+
+export async function fetchPreferences(): Promise<UserPreferences> {
+  return fetchJson("preferences");
+}
+
+export async function updatePreferences(
+  data: Partial<Omit<UserPreferences, "user_id" | "updated_at">>,
+): Promise<UserPreferences> {
+  const res = await fetch(`${API_BASE}/preferences`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
 // --- Exports ---
 
 export async function downloadExport(

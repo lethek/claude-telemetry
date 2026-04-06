@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.svg" alt="Logo" width="95">
+
 # claude-telemetry
 
 <img src="docs/screenshot-overview.png" alt="Dashboard Overview" width="800">
@@ -28,11 +30,18 @@ The agent does **no custom JSONL parsing** — it calls `ccusage` as the parsing
 - Multi-PC aggregation with per-machine tracking
 - Auto-sync daemon (Elastic/Wazuh style agent)
 - Dark-mode dashboard with interactive charts (Recharts)
-- Rate limit insights and cost optimization recommendations
+- **5-hour block tracking** with active block card, burn rate, and multi-PC timeline
+- **Plan vs API cost comparison** (Pro/Max 5x/Max 20x/Custom)
+- **Rate limit progress bars** (5-hour + weekly windows)
+- **Usage pace calculator** with trend detection
+- **Project budget tracker** with alerts at 90%/100%
+- **Weekly usage reports** with daily/weekly toggle
+- Cross-machine usage pace comparison
 - Model mix analysis (Opus/Sonnet/Haiku breakdown)
-- Supabase Auth (magic link login)
+- Supabase Auth (magic link login) with email whitelist
 - Cloudflare Workers proxy (zero exposed keys in frontend)
 - Deploy page with copy-paste agent install commands
+- Statusline auto-setup for rate limit tracking
 - Export data as CSV/JSON
 - Uses existing tools (ccusage) — no custom JSONL parsing
 
@@ -42,7 +51,11 @@ The agent does **no custom JSONL parsing** — it calls `ccusage` as the parsing
 
 1. Create account at [supabase.com](https://supabase.com)
 2. New Project — choose name and region
-3. SQL Editor — paste contents of [`supabase/migrations/001_initial_schema.sql`](supabase/migrations/001_initial_schema.sql) — Run
+3. SQL Editor — paste and run each migration in order:
+   1. [`supabase/migrations/001_initial_schema.sql`](supabase/migrations/001_initial_schema.sql)
+   2. [`supabase/migrations/002_stats_extra_unique.sql`](supabase/migrations/002_stats_extra_unique.sql)
+   3. [`supabase/migrations/003_user_preferences.sql`](supabase/migrations/003_user_preferences.sql)
+   4. [`supabase/migrations/004_blocks.sql`](supabase/migrations/004_blocks.sql)
 4. Authentication > URL Configuration:
    - **Site URL:** `https://your-app.pages.dev`
    - **Redirect URLs:** add same URL
@@ -82,15 +95,16 @@ claude-tracker install-service  # auto-sync every 15min
 
 | Page | Description |
 |---|---|
-| **Overview** | Total cost, daily chart, model pie, machine cards |
-| **Daily** | Stacked area chart, top 10 days, hour heatmap |
-| **Projects** | Cost by project, pie distribution, full table |
+| **Overview** | Total cost, daily chart, model pie, machine cards, plan savings, rate limits |
+| **Daily** | Stacked area chart with daily/weekly toggle, top 10 days, hour heatmap |
+| **Blocks** | 5-hour block timeline, active block card, burn rate, multi-PC table |
+| **Projects** | Cost by project, pie distribution, budget progress bars, full table |
 | **Models** | Opus/Sonnet/Haiku breakdown, mix over time, savings alert |
-| **Machines** | Per-machine cards, comparison chart, status badges |
-| **Deploy** | Generate agent install commands with one-click copy |
-| **Sessions** | Paginated table with sorting and filters |
-| **Insights** | Rate projections, optimization tips, trend analysis |
-| **Settings** | Machine management, export, alert thresholds |
+| **Machines** | Per-machine cards, comparison chart, daily pace, status badges |
+| **Deploy** | Generate agent install commands with one-click copy, statusline setup |
+| **Sessions** | Paginated table with sorting, filters by machine/project/type |
+| **Insights** | Plan value, burn rate, rate limits, budgets, trend analysis, cross-machine |
+| **Settings** | Plan selection, project budgets, alert thresholds, machine management, export |
 
 ## CLI Reference
 
@@ -107,6 +121,7 @@ claude-tracker install-service  # auto-sync every 15min
 | `claude-tracker service-status` | Check daemon status |
 | `claude-tracker status` | Show config and last sync |
 | `claude-tracker local --daily` | View local data without syncing |
+| `claude-tracker setup-statusline` | Configure rate limit tracking |
 | `claude-tracker uninstall` | Remove agent config from this machine |
 
 ## Security

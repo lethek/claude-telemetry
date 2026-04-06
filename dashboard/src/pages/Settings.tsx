@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchMachines, deleteMachine, downloadExport } from "../lib/api";
+import { fetchMachines, deleteMachine, downloadExport, fetchProjectCosts } from "../lib/api";
 import { getStatusDisplay } from "../lib/machineStatus";
+import { usePreferences } from "../hooks/usePreferences";
+import { daysAgo, today } from "../lib/dateUtils";
 import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal";
 
 interface Machine {
@@ -14,15 +16,18 @@ interface Machine {
 }
 
 export function Settings() {
+  const { prefs, save } = usePreferences();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  const [dailyThreshold, setDailyThreshold] = useState(() =>
-    localStorage.getItem("alert_daily_threshold") || "20",
-  );
-  const [weeklyThreshold, setWeeklyThreshold] = useState(() =>
-    localStorage.getItem("alert_weekly_threshold") || "100",
-  );
+  const [dailyThreshold, setDailyThreshold] = useState("");
+  const [weeklyThreshold, setWeeklyThreshold] = useState("");
+
+  // Sync local state from preferences
+  useEffect(() => {
+    setDailyThreshold(String(prefs.alert_thresholds?.daily || 20));
+    setWeeklyThreshold(String(prefs.alert_thresholds?.weekly || 100));
+  }, [prefs.alert_thresholds]);
 
   const loadMachines = useCallback(() => {
     setLoading(true);
@@ -59,8 +64,46 @@ export function Settings() {
   }, []);
 
   const saveThresholds = () => {
-    localStorage.setItem("alert_daily_threshold", dailyThreshold);
-    localStorage.setItem("alert_weekly_threshold", weeklyThreshold);
+    save({
+      alert_thresholds: {
+        daily: parseFloat(dailyThreshold) || 0,
+        weekly: parseFloat(weeklyThreshold) || 0,
+      },
+    });
+  };
+
+  // Project budgets
+  const [projectNames, setProjectNames] = useState<string[]>([]);
+  const [budgets, setBudgets] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const dateRange = { start: daysAgo(90), end: today() };
+    fetchProjectCosts(dateRange.start, dateRange.end)
+      .then((data) => {
+        const arr = data as Array<{ project: string }>;
+        setProjectNames(arr.map((p) => p.project));
+      })
+      .catch(() => {});
+  }, []);
+
+  // Sync budgets from preferences
+  useEffect(() => {
+    if (prefs.project_budgets) {
+      const b: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prefs.project_budgets)) {
+        b[k] = String(v);
+      }
+      setBudgets(b);
+    }
+  }, [prefs.project_budgets]);
+
+  const saveBudgets = () => {
+    const parsed: Record<string, number> = {};
+    for (const [k, v] of Object.entries(budgets)) {
+      const num = parseFloat(v);
+      if (num > 0) parsed[k] = num;
+    }
+    save({ project_budgets: parsed });
   };
 
   return (
@@ -124,6 +167,58 @@ export function Settings() {
         )}
       </div>
 
+      {/* Your Plan */}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <h3 className="mb-3 text-sm font-medium">Your Plan</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Plan tier</label>
+            <select
+              value={prefs.plan_name || "none"}
+              onChange={(e) => {
+                const name = e.target.value;
+                const costs: Record<string, number | null> = {
+                  none: null,
+                  pro: 20,
+                  max5x: 100,
+                  max20x: 200,
+                  custom: prefs.plan_cost,
+                };
+                save({ plan_name: name, plan_cost: costs[name] ?? null });
+              }}
+              aria-label="Select plan"
+              className="w-full rounded-lg border border-white/[0.06] bg-slate-800 px-3 py-1.5 text-sm text-white outline-none"
+            >
+              <option value="none">Not selected</option>
+              <option value="pro">Pro ($20/mo)</option>
+              <option value="max5x">Max 5x ($100/mo)</option>
+              <option value="max20x">Max 20x ($200/mo)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          {prefs.plan_name === "custom" && (
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                Monthly cost ($)
+              </label>
+              <input
+                type="number"
+                value={prefs.plan_cost ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value ? parseFloat(e.target.value) : null;
+                  save({ plan_cost: val });
+                }}
+                placeholder="150"
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-sm font-mono outline-none focus:border-sky-500/50"
+              />
+            </div>
+          )}
+        </div>
+        <p className="mt-2 text-[10px] text-slate-600">
+          Used to calculate savings vs API pricing on the Overview page.
+        </p>
+      </div>
+
       {/* Authorized emails */}
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
         <h3 className="mb-3 text-sm font-medium">Authorized Emails</h3>
@@ -175,6 +270,44 @@ export function Settings() {
         >
           Save Thresholds
         </button>
+      </div>
+
+      {/* Project Budgets */}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <h3 className="mb-3 text-sm font-medium">Project Budgets</h3>
+        {projectNames.length > 0 ? (
+          <>
+            <div className="space-y-2">
+              {projectNames.map((name) => (
+                <div key={name} className="flex items-center gap-3">
+                  <span className="flex-1 text-xs truncate">{name}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-slate-500">$</span>
+                    <input
+                      type="number"
+                      value={budgets[name] || ""}
+                      onChange={(e) => setBudgets((b) => ({ ...b, [name]: e.target.value }))}
+                      placeholder="—"
+                      className="w-20 rounded border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-xs font-mono outline-none focus:border-sky-500/50"
+                    />
+                    <span className="text-[10px] text-slate-600">/mo</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={saveBudgets}
+              className="mt-3 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-600"
+            >
+              Save Budgets
+            </button>
+          </>
+        ) : (
+          <p className="text-xs text-slate-500">No projects found. Sync data first.</p>
+        )}
+        <p className="mt-2 text-[10px] text-slate-600">
+          Projects without a budget won't trigger alerts.
+        </p>
       </div>
 
       {/* Export */}
