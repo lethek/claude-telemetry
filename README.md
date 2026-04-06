@@ -191,11 +191,13 @@ Or just star the repo — it helps a lot!
 
 ## Star History
 
-<div align="center">
-<a href="https://star-history.com/#RyanTech00/claude-telemetry&Date">
-  <img src="https://api.star-history.com/svg?repos=RyanTech00/claude-telemetry&type=Date" width="500" alt="Star History">
+<a href="https://www.star-history.com/?repos=RyanTech00%2Fclaude-telemetry&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=RyanTech00/claude-telemetry&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=RyanTech00/claude-telemetry&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=RyanTech00/claude-telemetry&type=date&legend=top-left" />
+ </picture>
 </a>
-</div>
 
 ## License
 
