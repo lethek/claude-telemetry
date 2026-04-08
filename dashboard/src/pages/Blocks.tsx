@@ -64,7 +64,7 @@ export function Blocks() {
       .finally(() => setLoading(false));
   }, [machineId, dateRange.start, dateRange.end]);
 
-  const activeBlock = blocks.find((b) => b.is_active && !b.is_gap);
+  const activeBlocks = blocks.filter((b) => b.is_active && !b.is_gap);
   const recentBlocks = blocks.filter((b) => !b.is_gap);
 
   return (
@@ -100,70 +100,74 @@ export function Blocks() {
         </div>
       )}
 
-      {/* Active block card */}
-      {activeBlock && (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-emerald-400">
-              Active Block
-            </h3>
-            <span className="text-xs text-slate-400">
-              Started {formatTime(activeBlock.block_start)}
-            </span>
-          </div>
-          {(() => {
-            const elapsed = activeBlock.duration_minutes;
-            const total = 300; // 5 hours
+      {/* Active block cards */}
+      {activeBlocks.length > 0 && (
+        <div className="space-y-3">
+          {activeBlocks.map((ab) => {
+            const elapsed = ab.duration_minutes;
+            const total = 300;
             const remaining = Math.max(0, total - elapsed);
             const pct = Math.min(100, (elapsed / total) * 100);
-            const burnRate = elapsed > 0 ? activeBlock.total_tokens / elapsed : 0;
+            const burnRate = elapsed > 0 ? ab.total_tokens / elapsed : 0;
             const projectedTokens = burnRate * total;
-            const projectedCost = elapsed > 0 ? (activeBlock.cost_usd / elapsed) * total : 0;
+            const projectedCost = elapsed > 0 ? (ab.cost_usd / elapsed) * total : 0;
+            const name = machineNameMap.get(ab.machine_id) || ab.machine_id.slice(0, 8);
 
             return (
-              <div className="space-y-3">
-                <div className="grid grid-cols-4 gap-4 text-xs">
-                  <div>
-                    <p className="text-slate-500">Remaining</p>
-                    <p className="font-mono font-medium text-white">
-                      {Math.floor(remaining / 60)}h {remaining % 60}m
-                    </p>
+              <div key={ab.id} className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-emerald-400">Active Block</h3>
+                    <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">{name}</span>
                   </div>
-                  <div>
-                    <p className="text-slate-500">Burn Rate</p>
-                    <p className="font-mono font-medium text-white">
-                      {formatTokens(burnRate)}/min
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Projected Cost</p>
-                    <p className="font-mono font-medium text-white">
-                      ${projectedCost.toFixed(2)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Projected Tokens</p>
-                    <p className="font-mono font-medium text-white">
-                      {formatTokens(projectedTokens)}
-                    </p>
-                  </div>
+                  <span className="text-xs text-slate-400">
+                    Started {formatTime(ab.block_start)}
+                  </span>
                 </div>
-                <div>
-                  <div className="h-3 rounded-full bg-white/[0.06]">
-                    <div
-                      className={`h-3 rounded-full transition-all ${
-                        pct > 80 ? "bg-rose-500" : pct > 50 ? "bg-amber-500" : "bg-emerald-500"
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-4 gap-4 text-xs">
+                    <div>
+                      <p className="text-slate-500">Remaining</p>
+                      <p className="font-mono font-medium text-white">
+                        {Math.floor(remaining / 60)}h {remaining % 60}m
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Burn Rate</p>
+                      <p className="font-mono font-medium text-white">
+                        {formatTokens(burnRate)}/min
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Projected Cost</p>
+                      <p className="font-mono font-medium text-white">
+                        ${projectedCost.toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Projected Tokens</p>
+                      <p className="font-mono font-medium text-white">
+                        {formatTokens(projectedTokens)}
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    {elapsed}min / {total}min ({pct.toFixed(0)}%)
-                  </p>
+                  <div>
+                    <div className="h-3 rounded-full bg-white/[0.06]">
+                      <div
+                        className={`h-3 rounded-full transition-all ${
+                          pct > 80 ? "bg-rose-500" : pct > 50 ? "bg-amber-500" : "bg-emerald-500"
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      {elapsed}min / {total}min ({pct.toFixed(0)}%)
+                    </p>
+                  </div>
                 </div>
               </div>
             );
-          })()}
+          })}
         </div>
       )}
 

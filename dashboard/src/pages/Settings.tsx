@@ -112,7 +112,7 @@ function NotificationsSection({ prefs, save }: { prefs: { notifications?: Notifi
       )}
 
       <p className="text-[10px] text-slate-600">
-        Requires cron: POST to <code className="text-slate-400">/api/cron/check-notifications</code> every 15 min
+        Requires cron: POST to <code className="text-slate-400">/api/cron-check-notifications</code> every 15 min
         with <code className="text-slate-400">X-Cron-Secret</code> header.
       </p>
     </div>

@@ -296,6 +296,58 @@ export async function updatePreferences(
   return res.json();
 }
 
+// --- Analytics ---
+
+export interface TrendsData {
+  direction: "up" | "down" | "stable";
+  slope: number;
+  avg: number;
+  stdev: number;
+  first_half_avg: number;
+  second_half_avg: number;
+  half_change_pct: number;
+  days: number;
+  forecast: Array<{ day: number; predicted: number }>;
+  forecast_total: number;
+  forecast_low: number;
+  forecast_high: number;
+  daily_data: Array<{
+    date: string;
+    cost: number;
+    tokens: number;
+    z_score: number;
+    is_anomaly: boolean;
+  }>;
+  error?: string;
+}
+
+export interface ComparePeriodsData {
+  period_a: { label: string; cost: number; tokens: number };
+  period_b: { label: string; cost: number; tokens: number };
+  cost_change_pct: number;
+  tokens_change_pct: number;
+  movers: Array<{ project: string; cost_a: number; cost_b: number; diff: number }>;
+}
+
+export async function fetchTrends(days?: number, machineId?: string): Promise<TrendsData> {
+  return fetchJson("analytics-trends", {
+    days: days?.toString(),
+    machine_id: machineId,
+  });
+}
+
+export async function fetchComparePeriods(
+  periodA: string = "last_week",
+  periodB: string = "this_week",
+  machineId?: string,
+): Promise<ComparePeriodsData> {
+  return fetchJson("analytics-compare-periods", {
+    period_a: periodA,
+    period_b: periodB,
+    machine_id: machineId,
+  });
+}
+
 // --- Notifications ---
 
 export async function testWebhook(webhookUrl: string): Promise<boolean> {

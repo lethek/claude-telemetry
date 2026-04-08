@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useUsageData } from "../hooks/useUsageData";
-import { deleteMachine } from "../lib/api";
+import { deleteMachine, fetchMachines } from "../lib/api";
 import { rangeToDate, formatTokens } from "../lib/dateUtils";
 import { getStatusDisplay } from "../lib/machineStatus";
 import { DateRangePicker } from "../components/filters/DateRangePicker";
@@ -22,6 +22,20 @@ export function Machines() {
   const { machines, loading } = useUsageData(dateRange);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [, setRefresh] = useState(0);
+
+  // Fetch last_sync_at from machines table (TIMESTAMPTZ, not DATE like get_machine_summary)
+  const [syncMap, setSyncMap] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    fetchMachines(false)
+      .then((rows) => {
+        const map = new Map<string, string>();
+        for (const r of rows as Array<{ id: string; last_sync_at: string | null }>) {
+          if (r.last_sync_at) map.set(r.id, r.last_sync_at);
+        }
+        setSyncMap(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const totalCost = machines.reduce((s, m) => s + m.total_cost, 0);
 
@@ -104,7 +118,8 @@ export function Machines() {
       {/* Machine cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {machines.map((m) => {
-          const badge = getStatusDisplay(m.last_activity);
+          const lastSyncAt = syncMap.get(m.machine_id) || null;
+          const badge = getStatusDisplay(lastSyncAt);
           const pct = totalCost > 0 ? ((m.total_cost / totalCost) * 100).toFixed(0) : "0";
           return (
             <div
@@ -148,7 +163,7 @@ export function Machines() {
                 <div>
                   <p className="text-slate-500">Last Activity</p>
                   <p className="font-mono font-medium text-[10px]">
-                    {m.last_activity || "never"}
+                    {lastSyncAt ? lastSyncAt.slice(0, 19).replace("T", " ") : m.last_activity || "never"}
                   </p>
                 </div>
               </div>
