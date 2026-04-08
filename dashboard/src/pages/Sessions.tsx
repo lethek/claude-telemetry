@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { fetchSessions, type PaginatedSessions, type SessionRow } from "../lib/api";
 import { useMachineFilter } from "../hooks/useMachineFilter";
 import { formatTokens } from "../lib/dateUtils";
+import { EmptyState } from "../components/EmptyState";
+import { EmptyChat } from "../components/illustrations/EmptyChat";
 
 function ModelBadge({ model }: { model: string }) {
   const name = model.split("-").pop() || model;
@@ -147,6 +149,14 @@ export function Sessions() {
         <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3">
           <p className="text-xs text-rose-400">Failed to load sessions: {error}</p>
         </div>
+      )}
+
+      {!loading && data.length === 0 && (
+        <EmptyState
+          illustration={<EmptyChat />}
+          title="No sessions synced yet"
+          description="Each Claude Code session will be tracked here after syncing."
+        />
       )}
 
       {/* Sessions table */}

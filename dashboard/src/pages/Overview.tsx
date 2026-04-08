@@ -3,6 +3,8 @@ import { MetricCard } from "../components/cards/MetricCard";
 import { MachineCard } from "../components/cards/MachineCard";
 import { DailyCostChart } from "../components/charts/DailyCostChart";
 import { ModelBreakdown } from "../components/charts/ModelBreakdown";
+import { EmptyState } from "../components/EmptyState";
+import { EmptyDashboard } from "../components/illustrations/EmptyDashboard";
 import { MonthlyCostChart } from "../components/charts/MonthlyCostChart";
 import { DateRangePicker } from "../components/filters/DateRangePicker";
 import { useUsageData } from "../hooks/useUsageData";
@@ -187,9 +189,14 @@ export function Overview() {
               />
             ))}
             {machines.length === 0 && !loading && (
-              <p className="col-span-2 text-xs text-slate-600">
-                No machines registered yet. Run `cc-telemetry setup` on your PCs.
-              </p>
+              <div className="col-span-2">
+                <EmptyState
+                  illustration={<EmptyDashboard />}
+                  title="No usage data yet"
+                  description="Install the agent on your first machine to see real-time data here."
+                  action={{ label: "View install guide", href: "#deploy" }}
+                />
+              </div>
             )}
           </div>
         </div>

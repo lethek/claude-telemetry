@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { fetchBlocks, type BlockRow } from "../lib/api";
 import { useMachineFilter } from "../hooks/useMachineFilter";
 import { formatTokens, daysAgo, today } from "../lib/dateUtils";
+import { EmptyState } from "../components/EmptyState";
+import { EmptyTimeline } from "../components/illustrations/EmptyTimeline";
 
 function ModelBadge({ model }: { model: string }) {
   const name = model.split("-").pop() || model;
@@ -245,9 +247,11 @@ export function Blocks() {
         </div>
 
         {blocks.filter((b) => !b.is_gap).length === 0 && !loading && (
-          <div className="p-6 text-center text-xs text-slate-500">
-            No blocks found. Run <code className="text-slate-400">cc-telemetry sync</code> to fetch block data.
-          </div>
+          <EmptyState
+            illustration={<EmptyTimeline />}
+            title="No billing blocks yet"
+            description="Start a Claude Code session to see your 5-hour billing blocks."
+          />
         )}
       </div>
     </div>

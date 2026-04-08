@@ -3,6 +3,8 @@ import { useUsageData } from "../hooks/useUsageData";
 import { useMachineFilter } from "../hooks/useMachineFilter";
 import { fetchStatsExtra } from "../lib/api";
 import { rangeToDate, groupByWeek } from "../lib/dateUtils";
+import { EmptyState } from "../components/EmptyState";
+import { EmptyChart } from "../components/illustrations/EmptyChart";
 import { usePreferences } from "../hooks/usePreferences";
 import { DateRangePicker } from "../components/filters/DateRangePicker";
 import {
@@ -116,7 +118,15 @@ export function Daily() {
       )}
 
       {/* Chart */}
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+      {!loading && summary.length === 0 && (
+        <EmptyState
+          illustration={<EmptyChart />}
+          title="No daily usage yet"
+          description="Daily charts will appear once your agent syncs data."
+          action={{ label: "View install guide", href: "#deploy" }}
+        />
+      )}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4" style={!loading && summary.length === 0 ? { display: "none" } : {}}>
         <h3 className="mb-4 text-sm font-medium">
           {view === "daily" ? "Daily Cost by Model" : "Weekly Cost by Model"}
         </h3>

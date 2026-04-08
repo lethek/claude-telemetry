@@ -3,6 +3,8 @@ import { useUsageData } from "../hooks/useUsageData";
 import { useAlertThresholds } from "../hooks/useAlertThresholds";
 import { usePreferences } from "../hooks/usePreferences";
 import { useMachineFilter } from "../hooks/useMachineFilter";
+import { EmptyState } from "../components/EmptyState";
+import { EmptyInsights } from "../components/illustrations/EmptyInsights";
 import { fetchRateLimits } from "../lib/api";
 import { daysAgo, today, formatTokens } from "../lib/dateUtils";
 import { calculateUsagePace } from "../lib/burnRate";
@@ -306,14 +308,11 @@ export function Insights() {
       </div>
 
       {insights.length === 0 && !loading && (
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
-          <p className="text-sm text-slate-400">
-            Not enough data for insights yet.
-          </p>
-          <p className="mt-1 text-xs text-slate-600">
-            Keep syncing and check back in a few days.
-          </p>
-        </div>
+        <EmptyState
+          illustration={<EmptyInsights />}
+          title="Insights coming soon"
+          description="Available after 3+ days of usage data. Keep syncing and check back."
+        />
       )}
     </div>
   );

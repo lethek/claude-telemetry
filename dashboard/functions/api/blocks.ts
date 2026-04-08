@@ -13,7 +13,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const filters: string[] = [];
   if (machine_id) filters.push(`machine_id=eq.${machine_id}`);
   if (start_date) filters.push(`block_start=gte.${start_date}`);
-  if (end_date) filters.push(`block_start=lte.${end_date}`);
+  if (end_date) filters.push(`block_start=lte.${end_date}T23:59:59Z`);
   if (active_only === "true") filters.push("is_active=eq.true");
 
   const filterQuery = filters.length > 0 ? `&${filters.join("&")}` : "";

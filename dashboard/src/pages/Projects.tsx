@@ -4,6 +4,8 @@ import { usePreferences } from "../hooks/usePreferences";
 import { rangeToDate } from "../lib/dateUtils";
 import { DateRangePicker } from "../components/filters/DateRangePicker";
 import { MetricCard } from "../components/cards/MetricCard";
+import { EmptyState } from "../components/EmptyState";
+import { EmptyFolder } from "../components/illustrations/EmptyFolder";
 import {
   BarChart,
   Bar,
@@ -79,6 +81,14 @@ export function Projects() {
           <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400" />
           Loading...
         </div>
+      )}
+
+      {!loading && projects.length === 0 && (
+        <EmptyState
+          illustration={<EmptyFolder />}
+          title="No projects tracked"
+          description="Use Claude Code in any project directory and sync to see it here."
+        />
       )}
 
       {/* Metric cards */}
