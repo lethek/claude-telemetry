@@ -2,6 +2,15 @@
 
 Lightweight Python agent that collects Claude Code usage data and syncs to Supabase.
 
+## Features
+
+- Auto-sync daemon with configurable interval
+- **Real-time hooks** — instant sync on SessionEnd + Stop events
+- **MCP server** with 12 tools — query usage data directly from Claude Code
+- **Setup wizard** — one command configures hooks, MCP, statusline, daemon
+- **Doctor** — 10-point health check for all components
+- **Webhook notifications** — Discord/Slack alerts for budget and rate limit thresholds
+
 ## Prerequisites
 
 - Python 3.11+
@@ -11,17 +20,28 @@ Lightweight Python agent that collects Claude Code usage data and syncs to Supab
 ## Install
 
 ```bash
+pip install cc-telemetry
+```
+
+<details>
+<summary>Alternative: install from source</summary>
+
+```bash
 cd agent
 python3 -m venv venv
 source venv/bin/activate  # Windows: .\venv\Scripts\Activate
 pip install -e .
 ```
+</details>
 
 ## Setup
 
 ```bash
-# Interactive
+# Full setup wizard (configures hooks, MCP, statusline, daemon — all in one)
 cc-telemetry setup
+
+# Minimal setup (config + first sync only, no hooks/MCP/statusline)
+cc-telemetry setup --minimal
 
 # Non-interactive (from Deploy page)
 cc-telemetry setup --non-interactive \
@@ -29,36 +49,59 @@ cc-telemetry setup --non-interactive \
   --supabase-url "https://xxx.supabase.co" \
   --supabase-key "eyJ..." \
   --machine-id "uuid"
+
+# Verify everything is working
+cc-telemetry doctor
 ```
 
-## Commands
+## CLI Reference
+
+**Setup**
 
 | Command | Description |
 |---|---|
-| `cc-telemetry setup` | Configure agent |
-| `cc-telemetry sync` | Manual sync |
-| `cc-telemetry sync --verbose` | Sync with details |
+| `cc-telemetry setup` | Setup wizard — configure everything in one command |
+| `cc-telemetry doctor` | Health check — verify all components |
+| `cc-telemetry setup-hooks` | Configure real-time sync hooks |
+| `cc-telemetry setup-mcp` | Register MCP server with Claude Code |
+| `cc-telemetry setup-statusline` | Configure rate limit tracking |
+
+**Operation**
+
+| Command | Description |
+|---|---|
+| `cc-telemetry sync` | Manual sync to Supabase |
+| `cc-telemetry sync --verbose` | Sync with detailed output |
 | `cc-telemetry sync --force` | Re-sync all data |
-| `cc-telemetry daemon` | Auto-sync foreground |
-| `cc-telemetry daemon --interval 10` | Custom interval |
-| `cc-telemetry daemon --background` | Run detached |
+| `cc-telemetry status` | Show config and last sync |
+| `cc-telemetry local --daily` | View local data without syncing |
+
+**Service**
+
+| Command | Description |
+|---|---|
+| `cc-telemetry daemon` | Run auto-sync in foreground |
 | `cc-telemetry install-service` | Install as system service |
-| `cc-telemetry uninstall-service` | Remove service |
+| `cc-telemetry uninstall-service` | Remove system service |
 | `cc-telemetry service-status` | Check daemon status |
-| `cc-telemetry status` | Show config info |
-| `cc-telemetry local --daily` | View data locally |
-| `cc-telemetry local --sessions` | View sessions locally |
-| `cc-telemetry local --projects` | View project summary |
+
+**Cleanup**
+
+| Command | Description |
+|---|---|
+| `cc-telemetry uninstall` | Remove agent config from this machine |
 
 ## How It Works
 
 The agent does **not** parse JSONL files directly. It calls `ccusage` as the parsing layer:
 
-1. `npx ccusage@latest daily --json --instances` — daily usage by project and model
-2. `npx ccusage@latest session --json` — session-level usage
+1. `npx ccusage daily --json --instances` — daily usage by project and model
+2. `npx ccusage session --json` — session-level usage
 3. Reads `~/.claude/stats-cache.json` — hour counts, activity data
 4. Adds `machine_id` to all records
 5. UPSERTs to Supabase with incremental sync
+
+When **hooks** are configured, sync also triggers automatically on session end (with 2-minute debounce).
 
 ## Tests
 
