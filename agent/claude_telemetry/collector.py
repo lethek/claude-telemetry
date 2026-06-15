@@ -64,10 +64,10 @@ def _session_id_to_project(session_id: str) -> str:
 
 def collect_daily_usage(since: str | None = None) -> list[DailyUsage]:
     """
-    Call `npx ccusage@latest daily --json --instances` and flatten
+    Call `npx ccusage@latest claude daily --json --instances` and flatten
     the per-project, per-model breakdowns into DailyUsage records.
     """
-    cmd = ["npx", "ccusage@latest", "daily", "--json", "--instances", "--no-color"]
+    cmd = ["npx", "ccusage@latest", "claude", "daily", "--json", "--instances", "--no-color"]
     if since:
         cmd.extend(["--since", since])
 

@@ -74,18 +74,18 @@ def _migrate_legacy_config() -> None:
     # 4. Update hook scripts (.ps1 / .sh) that still reference claude_tracker
     claude_dir = Path.home() / ".claude"
     for script_name in ("hook-session-sync.ps1", "hook-session-sync.sh"):
-        script = claude_dir / script_name
-        if script.exists():
-            try:
-                content = script.read_text(encoding="utf-8")
-                if "claude_tracker" in content:
-                    script.write_text(
-                        content.replace("claude_tracker", "claude_telemetry"),
-                        encoding="utf-8",
-                    )
-                    click.echo(f"Migrated hook script: {script}")
-            except Exception:
-                pass
+        for script in (claude_dir / script_name, claude_dir / "hooks" / script_name):
+            if script.exists():
+                try:
+                    content = script.read_text(encoding="utf-8")
+                    if "claude_tracker" in content:
+                        script.write_text(
+                            content.replace("claude_tracker", "claude_telemetry"),
+                            encoding="utf-8",
+                        )
+                        click.echo(f"Migrated hook script: {script}")
+                except Exception:
+                    pass
 
     # 5. Fix StatusLine: move from hooks.StatusLine to top-level statusLine
     if settings_path.exists():
@@ -169,10 +169,11 @@ def setup(
     click.echo(f"  Node.js: {node_ver}")
 
     # --- Step 2: Check/install ccusage ---
+    npx_cmd = shutil.which("npx") or "npx"
     if not shutil.which("ccusage") and not shutil.which("npx"):
         pass  # npx will handle it
     ccusage_check = subprocess.run(
-        ["npx", "ccusage@latest", "--version"], capture_output=True, text=True, timeout=30,
+        [npx_cmd, "ccusage@latest", "--version"], capture_output=True, text=True, timeout=30,
     )
     if ccusage_check.returncode == 0:
         click.echo(f"  ccusage: {ccusage_check.stdout.strip() or 'available via npx'}")
@@ -195,7 +196,7 @@ def setup(
             click.echo("  ccost:   not found")
             if click.confirm("  Install ccost globally? (enables rate limit tracking)", default=True):
                 result = subprocess.run(
-                    ["npm", "install", "-g", "ccost"], capture_output=True, text=True
+                    [shutil.which("npm") or "npm", "install", "-g", "ccost"], capture_output=True, text=True
                 )
                 if result.returncode == 0:
                     try:
@@ -670,13 +671,25 @@ def _setup_hooks_internal() -> None:
         if pythonw.exists():
             python_path = str(pythonw)
 
+    hooks_dir = claude_dir / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+
     if system == "Windows":
-        script_path = claude_dir / "hook-session-sync.ps1"
-        script_path.write_text(textwrap.dedent(f"""\
-            Start-Process -FilePath "{python_path}" -ArgumentList "-m","claude_telemetry.hook_sync" -WindowStyle Hidden
+        ps1_path = hooks_dir / "hook-session-sync.ps1"
+        ps_python_path = python_path.replace("\\", "\\\\")
+        ps1_path.write_text(textwrap.dedent(f"""\
+            Start-Process -FilePath "{ps_python_path}" -ArgumentList "-m","claude_telemetry.hook_sync" -WindowStyle Hidden
         """))
+        # Claude Code hooks run via bash, not PowerShell — register a .sh wrapper
+        script_path = hooks_dir / "hook-session-sync.sh"
+        ps1_escaped = str(ps1_path).replace("\\", "\\\\")
+        script_path.write_text(textwrap.dedent(f"""\
+            #!/bin/bash
+            powershell.exe -NonInteractive -WindowStyle Hidden -Command "& '{ps1_escaped}'"
+        """))
+        script_path.chmod(0o755)
     else:
-        script_path = claude_dir / "hook-session-sync.sh"
+        script_path = hooks_dir / "hook-session-sync.sh"
         script_path.write_text(textwrap.dedent(f"""\
             #!/bin/bash
             nohup "{python_path}" -m claude_telemetry.hook_sync > /dev/null 2>&1 &
@@ -1040,7 +1053,7 @@ def _install_windows_service(tracker_path: str) -> None:
         subprocess.run(["schtasks", "/Run", "/TN", "ClaudeUsageTracker"])
         click.echo("Daemon started.")
     else:
-        click.echo(f"ERROR: {result.stderr}")
+        click.echo(f"Service install failed: {result.stderr.strip()}")
 
 
 def _uninstall_windows_service() -> None:
