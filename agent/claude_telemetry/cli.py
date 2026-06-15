@@ -705,7 +705,9 @@ def _setup_hooks_internal() -> None:
         except Exception:
             pass
     settings.setdefault("hooks", {})
-    hook_entry = {"hooks": [{"type": "command", "command": str(script_path)}]}
+    # Use forward slashes: bash on Windows interprets backslashes as escape chars
+    hook_command = str(script_path).replace("\\", "/")
+    hook_entry = {"hooks": [{"type": "command", "command": hook_command}]}
     settings["hooks"]["SessionEnd"] = [hook_entry]
     settings["hooks"]["Stop"] = [hook_entry]
     settings_path.write_text(json.dumps(settings, indent=2))
