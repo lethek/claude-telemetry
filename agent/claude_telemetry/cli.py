@@ -15,6 +15,13 @@ from pathlib import Path
 import click
 
 from . import __version__
+
+
+def _find_npx() -> str | None:
+    """Return the npx executable path, checking npx.cmd on Windows."""
+    return shutil.which("npx") or (shutil.which("npx.cmd") if sys.platform == "win32" else None)
+
+
 from .config import (
     CONFIG_DIR,
     CONFIG_FILE,
@@ -156,7 +163,7 @@ def setup(
     click.echo("=== Claude Telemetry — Setup Wizard ===\n")
 
     # --- Step 1: Check Node.js ---
-    if not shutil.which("npx"):
+    if not _find_npx():
         click.echo("ERROR: npx not found. Install Node.js 18+ first.")
         click.echo("  Windows: winget install OpenJS.NodeJS")
         click.echo("  macOS:   brew install node")
@@ -169,8 +176,8 @@ def setup(
     click.echo(f"  Node.js: {node_ver}")
 
     # --- Step 2: Check/install ccusage ---
-    npx_cmd = shutil.which("npx") or "npx"
-    if not shutil.which("ccusage") and not shutil.which("npx"):
+    npx_cmd = _find_npx() or "npx"
+    if not shutil.which("ccusage") and not _find_npx():
         pass  # npx will handle it
     ccusage_check = subprocess.run(
         [npx_cmd, "ccusage@latest", "--version"], capture_output=True, text=True, timeout=30,
@@ -850,7 +857,7 @@ def doctor() -> None:
             click.echo(f"  {mark}  {label:<28s} {hint}")
 
     # 1. ccusage (global install OR available via npx)
-    ccusage_ok = bool(shutil.which("ccusage")) or bool(shutil.which("npx"))
+    ccusage_ok = bool(shutil.which("ccusage")) or bool(_find_npx())
     _check("ccusage", ccusage_ok,
            "installed" if shutil.which("ccusage") else "available via npx",
            "Install Node.js 18+ (npx required)")
